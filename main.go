@@ -75,6 +75,9 @@ func draw(w *app.Window) error {
 
 	th := material.NewTheme(gofont.Collection())
 
+	// Focusing player's text edit by default
+	playerLineEditor.Focus()
+
 	for {
 		select {
 		case e := <-w.Events():
@@ -91,6 +94,10 @@ func draw(w *app.Window) error {
 						checkbox.Value = !checkbox.Value
 						w.Invalidate()
 						break
+					}
+
+					if v.Hovered() {
+						// TODO change background
 					}
 				}
 
@@ -211,6 +218,14 @@ func kitchen(gtx C, th *material.Theme) D {
 						}
 						clickableRow := clickableArchives[archive]
 						return material.Clickable(gtx, clickableRow, func(gtx C) D {
+							/*clip.Rect{
+								Max: image.Point{
+									X: gtx.Constraints.Min.X,
+									Y: gtx.Constraints.Min.Y,
+								},
+							}.Add(gtx.Ops)
+							paint.Fill(gtx.Ops, color.NRGBA{R: 0xff})*/
+
 							return rowWidget(gtx, i)
 						})
 					})
