@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"gioui.org/app"
 	"gioui.org/font/gofont"
 	"gioui.org/io/system"
@@ -80,7 +81,9 @@ func draw(w *app.Window) error {
 							archivesLoading = false
 						}()
 
-						//time.Sleep(5 * time.Second)
+						archiveListWidget.ResetList()
+
+						//time.Sleep(1 * time.Second)
 
 						var err error
 						player := strings.Trim(playerLineEditor.Text(), " ")
@@ -93,7 +96,6 @@ func draw(w *app.Window) error {
 							return
 						}
 
-						archiveListWidget.ResetList()
 						archiveListWidget.AddRows(archives)
 						w.Invalidate()
 					}()
@@ -141,12 +143,18 @@ func kitchen(gtx C, th *material.Theme) D {
 		return archivesBorder.Layout(gtx, func(gtx C) D {
 			insets := layout.UniformInset(unit.Dp(10))
 			return insets.Layout(gtx, func(gtx C) D {
-				if archiveListWidget.Size() == 0 {
-					lbl := material.Label(th, unit.Dp(16), "")
+
+				if archiveListWidget.IsNil() || archiveListWidget.Size() == 0 {
 					txt := "Enter a player's name to display archives"
+					if !archiveListWidget.IsNil() {
+						txt = fmt.Sprintf("No archives available for the selected user")
+					}
+
 					if archivesLoading {
 						txt = "Loading archives..."
 					}
+
+					lbl := material.Label(th, unit.Dp(16), "")
 					lbl.Text = txt
 					lbl.Alignment = text.Middle
 					lbl.MaxLines = 1

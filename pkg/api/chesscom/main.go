@@ -22,6 +22,13 @@ func GetAllPlayerArchives(username string) (*model.ChesscomArchives, error) {
 
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("user does not exist")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("an error occurred trying to get archives, status=%s", resp.Status)
+	}
+
 	archives := model.ChesscomArchives{}
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {

@@ -18,7 +18,7 @@ type ArchiveList struct {
 
 func NewArchiveList(th *material.Theme) *ArchiveList {
 	return &ArchiveList{
-		rows:  make([]*ArchiveRow, 0),
+		rows:  nil,
 		theme: th,
 		list: widget.List{
 			List: layout.List{
@@ -38,6 +38,10 @@ func (a *ArchiveList) AddRows(archives *model.ChesscomArchives) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
+	if a.rows == nil {
+		a.rows = make([]*ArchiveRow, 0)
+	}
+
 	for _, arch := range archives.Archives {
 		a.rows = append(a.rows, NewArchiveRow(a.theme, arch))
 	}
@@ -46,7 +50,11 @@ func (a *ArchiveList) AddRows(archives *model.ChesscomArchives) {
 func (a *ArchiveList) ResetList() {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	a.rows = make([]*ArchiveRow, 0)
+	a.rows = nil
+}
+
+func (a *ArchiveList) IsNil() bool {
+	return a.rows == nil
 }
 
 func (a *ArchiveList) Size() int {
