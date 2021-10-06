@@ -3,6 +3,8 @@ package widget
 import (
 	"fmt"
 	"gioui.org/layout"
+	"gioui.org/op/clip"
+	"gioui.org/op/paint"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
@@ -32,7 +34,39 @@ func (a *ArchiveRow) Layout(gtx layout.Context) layout.Dimensions {
 	return material.Clickable(gtx,
 		&a.Clickable,
 		func(gtx layout.Context) layout.Dimensions {
-			return a.layoutRow(gtx)
+			return layout.Stack{Alignment: layout.Center}.Layout(gtx,
+				layout.Expanded(func(gtx layout.Context) layout.Dimensions {
+					if !a.Hovered() {
+						return layout.Dimensions{}
+					}
+
+					return layout.Flex{
+						Axis:      layout.Horizontal,
+						Alignment: layout.Middle,
+					}.Layout(gtx,
+						layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+							shape := clip.Rect{Max: gtx.Constraints.Min}.Op()
+							paint.FillShape(gtx.Ops, a.theme.ContrastBg, shape)
+							return layout.Dimensions{Size: gtx.Constraints.Min}
+						}),
+					)
+				}),
+				layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+					paletteSaved := a.theme.Palette
+					defer func() { // restoring palette to original at the end
+						a.theme.Palette = paletteSaved
+					}()
+
+					if a.Hovered() { // When hovered, inverting palette colors
+						a.theme.Palette.Bg = paletteSaved.ContrastBg
+						a.theme.Palette.Fg = paletteSaved.ContrastFg
+						a.theme.Palette.ContrastBg = paletteSaved.Bg
+						a.theme.Palette.ContrastFg = paletteSaved.Fg
+					}
+
+					return a.layoutRow(gtx)
+				}),
+			)
 		},
 	)
 }
