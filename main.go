@@ -12,7 +12,9 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 	"github.com/nmaupu/chesscom_exporter/pkg/api/chesscom"
+	"github.com/nmaupu/chesscom_exporter/pkg/model"
 	mywidget "github.com/nmaupu/chesscom_exporter/pkg/ui/widget"
+	"golang.design/x/clipboard"
 	"image/color"
 	"log"
 	"os"
@@ -40,6 +42,13 @@ var (
 		CornerRadius: unit.Dp(8),
 		Width:        unit.Px(2),
 	}
+
+	saveToClipboardBtn          = new(widget.Clickable)
+	saveToClipboardInProgress   bool
+	saveToClipboardStatus       string
+	saveToClipboardProgress     float32
+	saveToClipboardCancelChan   = make(chan bool, 1)
+	saveToClipboardProgressChan = make(chan float32)
 )
 
 func main() {
@@ -83,8 +92,6 @@ func draw(w *app.Window) error {
 
 						archiveListWidget.ResetList()
 
-						//time.Sleep(1 * time.Second)
-
 						var err error
 						player := strings.Trim(playerLineEditor.Text(), " ")
 						if player == "" {
@@ -101,8 +108,81 @@ func draw(w *app.Window) error {
 					}()
 				}
 
+				if saveToClipboardBtn.Clicked() {
+					routine := func() { // Go routine to get all asked archives
+						saveToClipboardInProgress = true
+						saveToClipboardStatus = "In progress"
+						defer func() {
+							saveToClipboardInProgress = false
+						}()
+
+						// Resetting progress
+						saveToClipboardProgressChan <- 0
+
+						selectedArchives := archiveListWidget.GetSelectedArchives()
+						total := len(selectedArchives.Archives)
+						ch := make(chan struct {
+							idx     int
+							archive model.ChesscomArchive
+						}, total)
+
+						for i, archive := range selectedArchives.Archives {
+							ch <- struct {
+								idx     int
+								archive model.ChesscomArchive
+							}{idx: i, archive: archive}
+						}
+						close(ch)
+
+						builder := strings.Builder{}
+					loop:
+						for {
+							select {
+							case <-saveToClipboardCancelChan:
+								// Resetting progress
+								saveToClipboardProgressChan <- 0
+								saveToClipboardStatus = "Aborted."
+								return
+							case e, ok := <-ch:
+								if !ok { // no more jobs in channel
+									break loop
+								}
+								res, err := chesscom.GetPlayerMonthlyArchivesByURL(e.archive.GetURL())
+								if err != nil {
+									log.Printf("an error occurred trying to get archive %s", e.archive.GetURL())
+									continue
+								}
+
+								// Writing pgn games to a buffer
+								for _, game := range res.Games {
+									builder.Write([]byte(game.PGN + "\n"))
+								}
+
+								progress := float32(e.idx) / float32(total)
+								saveToClipboardProgressChan <- progress
+							}
+						}
+
+						clipboard.Write(clipboard.FmtText, []byte(builder.String()))
+						saveToClipboardProgressChan <- 1
+						saveToClipboardStatus = "Success !"
+					}
+
+					if saveToClipboardInProgress { // already in progress, canceling
+						saveToClipboardCancelChan <- true
+					} else {
+						go routine()
+					}
+				}
+
 				kitchen(gtx, theme)
 				e.Frame(gtx.Ops)
+			}
+		case p := <-saveToClipboardProgressChan:
+			if p <= 1 {
+				saveToClipboardProgress = p
+				log.Printf("Progress=%f", saveToClipboardProgress)
+				w.Invalidate()
 			}
 		}
 	}
@@ -167,6 +247,48 @@ func kitchen(gtx C, th *material.Theme) D {
 		})
 	}
 
+	saveToClipboardWidget := func(gtx C) D {
+		return layout.Flex{
+			Alignment: layout.Middle,
+			Axis:      layout.Vertical,
+		}.Layout(gtx,
+			layout.Rigid(material.ProgressBar(th, saveToClipboardProgress).Layout),
+			layout.Rigid(layout.Spacer{Height: unit.Dp(2)}.Layout),
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				return layout.Flex{
+					Alignment: layout.Middle,
+					Axis:      layout.Horizontal,
+					Spacing:   layout.SpaceStart,
+				}.Layout(gtx,
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						if saveToClipboardStatus != "" {
+							lbl := material.Label(th, unit.Dp(16), saveToClipboardStatus)
+							lbl.Font.Style = text.Italic
+							return lbl.Layout(gtx)
+						}
+						return layout.Dimensions{}
+					}),
+					layout.Rigid(layout.Spacer{Width: unit.Dp(5)}.Layout),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						txt := "Export to file"
+						btn := material.Button(th, saveToClipboardBtn, txt)
+						gtx = gtx.Disabled()
+						return btn.Layout(gtx)
+					}),
+					layout.Rigid(layout.Spacer{Width: unit.Dp(5)}.Layout),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						txt := "Export to clipboard"
+						if saveToClipboardInProgress {
+							txt = "Cancel export to clipboard"
+						}
+						btn := material.Button(th, saveToClipboardBtn, txt)
+						return btn.Layout(gtx)
+					}),
+				)
+			}),
+		)
+	}
+
 	outerInset := layout.UniformInset(unit.Dp(5))
 	return outerInset.Layout(gtx,
 		func(gtx C) D {
@@ -176,8 +298,9 @@ func kitchen(gtx C, th *material.Theme) D {
 				layout.Rigid(nickEditWidget),
 				layout.Rigid(layout.Spacer{Height: unit.Dp(5)}.Layout),
 				layout.Flexed(1, archivesListWidget),
+				layout.Rigid(layout.Spacer{Height: unit.Dp(5)}.Layout),
+				layout.Rigid(saveToClipboardWidget),
 			)
-
 		})
 }
 

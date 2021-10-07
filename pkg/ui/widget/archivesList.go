@@ -27,8 +27,9 @@ func NewArchiveList(th *material.Theme) *ArchiveList {
 		theme: th,
 		list: widget.List{
 			List: layout.List{
-				Axis:      layout.Vertical,
-				Alignment: layout.Middle,
+				Axis:        layout.Vertical,
+				Alignment:   layout.Middle,
+				ScrollToEnd: false,
 			},
 		},
 	}
@@ -43,12 +44,15 @@ func (a *ArchiveList) AddRows(archives *model.ChesscomArchives) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
+	lenArchives := len(archives.Archives)
+
 	if a.rows == nil {
-		a.rows = make([]*ArchiveRow, 0)
+		a.rows = make([]*ArchiveRow, lenArchives)
 	}
 
-	for _, arch := range archives.Archives {
-		a.rows = append(a.rows, NewArchiveRow(a.theme, arch))
+	// Revert order
+	for i, arch := range archives.Archives {
+		a.rows[len(archives.Archives)-i-1] = NewArchiveRow(a.theme, arch)
 	}
 }
 
@@ -66,6 +70,16 @@ func (a *ArchiveList) Size() int {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 	return len(a.rows)
+}
+
+func (a *ArchiveList) GetSelectedArchives() model.ChesscomArchives {
+	archives := model.ChesscomArchives{}
+	for _, arch := range a.rows {
+		if arch.checkbox.Value {
+			archives.Archives = append(archives.Archives, arch.Archive)
+		}
+	}
+	return archives
 }
 
 func (a *ArchiveList) Layout(gtx layout.Context) layout.Dimensions {
