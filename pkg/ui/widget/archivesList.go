@@ -72,6 +72,16 @@ func (a *ArchiveList) Size() int {
 	return len(a.rows)
 }
 
+// AtLeastOneSelected returns true if at least one element is selected, false otherwise
+func (a *ArchiveList) AtLeastOneSelected() bool {
+	for _, arch := range a.rows {
+		if arch.checkbox.Value {
+			return true
+		}
+	}
+	return false
+}
+
 func (a *ArchiveList) GetSelectedArchives() model.ChesscomArchives {
 	archives := model.ChesscomArchives{}
 	for _, arch := range a.rows {
