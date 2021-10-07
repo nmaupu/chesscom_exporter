@@ -25,6 +25,12 @@ import (
 	"strings"
 )
 
+var (
+	AppName    = "Chesscom Exporter"
+	AppVersion = "master"
+	BuildDate  = ""
+)
+
 type (
 	C = layout.Context
 	D = layout.Dimensions
@@ -61,7 +67,7 @@ var (
 func main() {
 	go func() {
 		w := app.NewWindow(
-			app.Title("Chesscom exporter"),
+			app.Title(fmt.Sprintf("%s - %s (%s)", AppName, AppVersion, BuildDate)),
 			app.Size(unit.Dp(800), unit.Dp(600)),
 			app.MinSize(unit.Dp(400), unit.Dp(400)),
 		)
